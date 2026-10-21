@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="/js/auth-check.js"></script>
     <script>AuthGuard.requireAuth(['organizer']);</script>
-    <title>Organizer Dashboard - College Event Management System</title>
+    <title>Organizer Dashboard - Event Management MACE</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="../file.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -56,7 +56,7 @@
         <!-- Sidebar -->
         <aside class="flex flex-col border-r border-[#e2e8f0] bg-white p-8">
             <div class="mb-12 flex items-center gap-3">
-                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white font-black text-xl italic shadow-lg shadow-blue-200">A</div>
+                <img src="/file.svg" alt="Event Management MACE logo" class="h-10 w-10 rounded-xl object-contain shadow-lg shadow-blue-200">
                 <span class="text-xl font-black tracking-tighter text-primary">ORGANIZER HUB</span>
             </div>
 
@@ -122,8 +122,9 @@
                             <div class="space-y-2">
                                 <label class="text-xs font-black text-gray-400 uppercase tracking-widest">Venue / Hall Selection</label>
                                 <select id="hallSelect" required class="w-full border-b border-gray-100 py-3 font-bold text-primary focus:border-primary outline-none transition-all appearance-none cursor-pointer">
-                                    <option value="">Loading Halls...</option>
+                                    <option value="">Loading venues...</option>
                                 </select>
+                                <input type="number" id="classroomNumber" min="1" step="1" placeholder="Specify classroom number" class="hidden w-full border-b border-gray-100 py-3 font-bold text-primary focus:border-primary outline-none transition-all">
                             </div>
                         </div>
 
@@ -649,20 +650,40 @@
         let selectedAttendanceEventId = null;
         let activeParticipantsData = [];
         let isRegistryLocked = false;
+        const organizerVenues = [
+            'PTA HALL',
+            'SH2',
+            'SH4',
+            'MCA HALL',
+            'TNP HALL',
+            'MAIN AUDITORIUM',
+            'OAT',
+            'OOTUPURA'
+        ];
 
-        // 🏢 FETCH HALLS FOR DROPDOWN
         async function loadHalls() {
             const select = document.getElementById('hallSelect');
             if(!select) return;
             try {
                 const res = await AuthGuard.secureFetch('/api/events/halls');
                 const halls = await res.json();
-                if(res.ok) {
-                    select.innerHTML = halls.map(h => `<option value="${h.id}">${h.name} (Cap: ${h.capacity})</option>`).join('');
+                if(res.ok && Array.isArray(halls)) {
+                    const availableHalls = halls.filter(h => organizerVenues.includes(h.name));
+                    select.innerHTML = '<option value="">Select a venue...</option>' +
+                        availableHalls.map(h => `<option value="${h.id}">${h.name}</option>`).join('') +
+                        '<option value="classroom">CLASSROOM:</option>';
                 }
             } catch(e) { console.error("Halls load failed", e); }
         }
         loadHalls();
+
+        document.getElementById('hallSelect').addEventListener('change', (event) => {
+            const classroomNumber = document.getElementById('classroomNumber');
+            const isClassroom = event.target.value === 'classroom';
+            classroomNumber.classList.toggle('hidden', !isClassroom);
+            classroomNumber.required = isClassroom;
+            if(!isClassroom) classroomNumber.value = '';
+        });
 
         function showSection(sectionId) {
             localStorage.setItem('activeOrganizerSection', sectionId);
@@ -1508,7 +1529,14 @@
 
             // Fill Modal
             document.getElementById('reviewTitle').textContent = form.querySelector('input[placeholder*="AI Symposium"]').value;
-            document.getElementById('reviewHall').textContent = document.getElementById('hallSelect').options[document.getElementById('hallSelect').selectedIndex].text.split('(')[0];
+            const hallSelect = document.getElementById('hallSelect');
+            const selectedHall = hallSelect.options[hallSelect.selectedIndex].text.split('(')[0];
+            const classroomNumber = hallSelect.value === 'classroom'
+                ? document.getElementById('classroomNumber').value
+                : '';
+            document.getElementById('reviewHall').textContent = classroomNumber
+                ? `${selectedHall} ${classroomNumber}`
+                : selectedHall;
             document.getElementById('reviewStart').textContent = new Date(form.querySelectorAll('input[type="datetime-local"]')[0].value).toLocaleString([], {dateStyle:'short', timeStyle:'short'});
             document.getElementById('reviewEnd').textContent = new Date(form.querySelectorAll('input[type="datetime-local"]')[1].value).toLocaleString([], {dateStyle:'short', timeStyle:'short'});
             document.getElementById('reviewDeadline').textContent = new Date(form.querySelectorAll('input[type="datetime-local"]')[2].value).toLocaleString([], {dateStyle:'short', timeStyle:'short'});
@@ -1575,7 +1603,26 @@
             
             // Populate Fields with stable IDs
             document.getElementById('eventTitle').value = event.title;
-            document.getElementById('hallSelect').value = event.hall_id;
+            const hallSelect = document.getElementById('hallSelect');
+            const classroomNumber = document.getElementById('classroomNumber');
+            if(event.hall_name && event.hall_name.startsWith('CLASSROOM: ')) {
+                hallSelect.value = 'classroom';
+                classroomNumber.value = event.hall_name.slice('CLASSROOM: '.length);
+                classroomNumber.classList.remove('hidden');
+                classroomNumber.required = true;
+            } else {
+                hallSelect.value = event.hall_id;
+                if(hallSelect.value !== String(event.hall_id) && event.hall_name) {
+                    const legacyVenue = document.createElement('option');
+                    legacyVenue.value = event.hall_id;
+                    legacyVenue.textContent = event.hall_name;
+                    hallSelect.appendChild(legacyVenue);
+                    hallSelect.value = event.hall_id;
+                }
+                classroomNumber.value = '';
+                classroomNumber.classList.add('hidden');
+                classroomNumber.required = false;
+            }
             
             const fmtDate = (d) => d ? new Date(d).toISOString().slice(0, 16) : "";
             document.getElementById('startDate').value = fmtDate(event.start_date);
@@ -1631,6 +1678,9 @@
         function resetForm() {
             const form = document.querySelector('form');
             form.reset();
+            const classroomNumber = document.getElementById('classroomNumber');
+            classroomNumber.classList.add('hidden');
+            classroomNumber.required = false;
             editingEventId = null;
             document.getElementById('formHeader').textContent = "Create New Event";
             document.getElementById('finalSubmitBtn').innerHTML = '<span>Confirm & Request Hall</span> <i data-lucide="check-circle" class="w-5 h-5"></i>';
@@ -1651,7 +1701,12 @@
 
             const payload = {
                 title: document.getElementById('eventTitle').value,
-                hall_id: parseInt(document.getElementById('hallSelect').value),
+                hall_id: document.getElementById('hallSelect').value === 'classroom'
+                    ? 'classroom'
+                    : parseInt(document.getElementById('hallSelect').value),
+                classroom_number: document.getElementById('hallSelect').value === 'classroom'
+                    ? document.getElementById('classroomNumber').value
+                    : null,
                 start_date: document.getElementById('startDate').value,
                 end_date: document.getElementById('endDate').value,
                 reg_deadline: document.getElementById('regDeadline').value,

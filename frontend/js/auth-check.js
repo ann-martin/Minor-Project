@@ -1,5 +1,5 @@
 /**
- * CampusHub Session Tracker & Auth Guard
+ * Event Management MACE Session Tracker & Auth Guard
  * Prevents unauthorized access and handles role-based redirection.
  */
 
@@ -159,4 +159,3 @@ window.addEventListener('pageshow', function(event) {
 
 // Global Logout Hook for HTML onclicks
 function logout() { AuthGuard.logout(); }
-

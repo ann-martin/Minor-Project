@@ -9,6 +9,32 @@ def migrate_missing_columns():
         # Registrations Table
         ("ALTER TABLE registrations ADD COLUMN IF NOT EXISTS payer_id INTEGER REFERENCES users(id);", "payer_id added to registrations"),
         ("ALTER TABLE registrations ADD COLUMN IF NOT EXISTS edit_count INTEGER DEFAULT 0;", "edit_count added to registrations"),
+        ("""
+        ALTER TABLE registrations DROP CONSTRAINT IF EXISTS registrations_event_id_key;
+        ALTER TABLE registrations DROP CONSTRAINT IF EXISTS registrations_student_id_key;
+        ALTER TABLE registration_members DROP CONSTRAINT IF EXISTS registration_members_registration_id_key;
+        ALTER TABLE registration_members DROP CONSTRAINT IF EXISTS registration_members_student_id_key;
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conrelid = 'registrations'::regclass
+                  AND conname = 'registrations_event_student_key'
+            ) THEN
+                ALTER TABLE registrations
+                ADD CONSTRAINT registrations_event_student_key UNIQUE (event_id, student_id);
+            END IF;
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conrelid = 'registration_members'::regclass
+                  AND conname = 'registration_members_registration_student_key'
+            ) THEN
+                ALTER TABLE registration_members
+                ADD CONSTRAINT registration_members_registration_student_key
+                UNIQUE (registration_id, student_id);
+            END IF;
+        END $$;
+        """, "Registration uniqueness updated to event/member pairs"),
         
         # Culturals Table
         ("ALTER TABLE culturals ADD COLUMN IF NOT EXISTS booking_deadline TIMESTAMP;", "booking_deadline added to culturals"),

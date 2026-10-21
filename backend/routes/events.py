@@ -7,6 +7,27 @@ import json
 
 events_bp = Blueprint('events', __name__)
 
+def resolve_hall_id(cur, hall_id, classroom_number=None):
+    if hall_id == 'classroom':
+        room_number = str(classroom_number or '').strip()
+        if not room_number.isdigit() or int(room_number) < 1:
+            raise ValueError("Enter a valid classroom number.")
+
+        room_name = f"CLASSROOM: {int(room_number)}"
+        cur.execute("""
+            INSERT INTO halls (name, capacity, description)
+            VALUES (%s, 0, 'Classroom capacity not specified')
+            ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+            RETURNING id
+        """, (room_name,))
+        return cur.fetchone()['id']
+
+    try:
+        return int(hall_id)
+    except (TypeError, ValueError):
+        raise ValueError("Select a valid venue.")
+
+
 @events_bp.route('/halls', methods=['GET'])
 @require_auth(roles=['organizer', 'admin'])
 def get_halls(current_user):
@@ -57,6 +78,7 @@ def create_event(current_user):
         title = data.get('title')
         description = data.get('description')
         hall_id = data.get('hall_id')
+        classroom_number = data.get('classroom_number')
         team_size = data.get('team_size')
         min_team_size = data.get('min_team_size', 1)
         female_mandatory = data.get('female_mandatory', False)
@@ -97,6 +119,11 @@ def create_event(current_user):
 
         with DatabaseConnection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                try:
+                    hall_id = resolve_hall_id(cur, hall_id, classroom_number)
+                except ValueError as e:
+                    return jsonify({"error": str(e)}), 400
+
                 # Use club_id from token, fallback to lookup if needed (rely on trigger as ultimate fallback)
                 club_id = current_user.get('club_id')
                 
@@ -195,6 +222,7 @@ def update_event(current_user, event_id):
                 title = data.get('title')
                 description = data.get('description')
                 hall_id = data.get('hall_id')
+                classroom_number = data.get('classroom_number')
                 team_size = data.get('team_size')
                 min_team_size = data.get('min_team_size', 1)
                 female_mandatory = data.get('female_mandatory')
@@ -233,6 +261,11 @@ def update_event(current_user, event_id):
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.info(f"Updating event {event_id} with payload: {data}")
+
+                try:
+                    hall_id = resolve_hall_id(cur, hall_id, classroom_number)
+                except ValueError as e:
+                    return jsonify({"error": str(e)}), 400
 
                 cur.execute("""
                     UPDATE events 

@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="/js/auth-check.js"></script>
     <script>AuthGuard.requireAuth(['admin']);</script>
-    <title>Admin Dashboard - College Event Management System</title>
-    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <title>Admin Dashboard - Event Management MACE</title>
+    <link rel="icon" type="image/svg+xml" href="../file.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -46,7 +46,7 @@
         <!-- Sidebar -->
         <aside class="flex flex-col border-r border-[#e2e8f0] bg-white p-8">
             <div class="mb-12 flex items-center gap-3">
-                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white font-black text-xl italic shadow-lg shadow-blue-200">A</div>
+                <img src="/file.svg" alt="Event Management MACE logo" class="h-10 w-10 rounded-xl object-contain shadow-lg shadow-blue-200">
                 <span class="text-xl font-black tracking-tighter text-primary">ADMIN PORTAL</span>
             </div>
 
@@ -290,7 +290,7 @@
                                     <div class="flex justify-between items-start mb-4">
                                         <div>
                                             <h4 id="previewHeader" class="text-xs font-black text-purple-900 leading-none uppercase">Admission Ticket</h4>
-                                            <p id="previewSub" class="text-[8px] font-bold text-slate-400 uppercase mt-1">CampusHub Arts Division</p>
+                                            <p id="previewSub" class="text-[8px] font-bold text-slate-400 uppercase mt-1">Event Management MACE Arts Division</p>
                                         </div>
                                         <div id="previewIcon" class="h-8 w-8 bg-purple-50 rounded text-purple-600 flex items-center justify-center">
                                             <i data-lucide="ticket" class="w-4 h-4"></i>
@@ -438,7 +438,7 @@
                 card.querySelector('p').classList.replace('text-slate-500', 'text-purple-900');
                 preview.className = "bg-white rounded-xl border-t-4 border-purple-600 p-5 shadow-sm transition-all";
                 pHeader.className = "text-xs font-black text-purple-900 leading-none uppercase";
-                pSub.textContent = "CampusHub Arts Division";
+                pSub.textContent = "Event Management MACE Arts Division";
                 pIcon.className = "h-8 w-8 bg-purple-50 rounded text-purple-600 flex items-center justify-center";
             } else if(tpl === 'midnight_gold') {
                 card.classList.replace('border-slate-100', 'border-indigo-950');
@@ -446,7 +446,7 @@
                 card.querySelector('p').classList.replace('text-slate-500', 'text-indigo-900');
                 preview.className = "bg-white rounded-xl border-t-4 border-indigo-950 p-5 shadow-sm transition-all";
                 pHeader.className = "text-xs font-black text-indigo-950 leading-none uppercase";
-                pSub.textContent = "CampusHub Royal Society";
+                pSub.textContent = "Event Management MACE Royal Society";
                 pIcon.className = "h-8 w-8 bg-indigo-50 rounded text-indigo-900 flex items-center justify-center";
             } else if(tpl === 'cyber_blue') {
                 card.classList.replace('border-slate-100', 'border-slate-900');
@@ -454,7 +454,7 @@
                 card.querySelector('p').classList.replace('text-slate-500', 'text-slate-900');
                 preview.className = "bg-white rounded-xl border-t-4 border-slate-900 p-5 shadow-sm transition-all";
                 pHeader.className = "text-xs font-black text-slate-900 leading-none uppercase";
-                pSub.textContent = "CampusHub Tech Beats";
+                pSub.textContent = "Event Management MACE Tech Beats";
                 pIcon.className = "h-8 w-8 bg-blue-50 rounded text-blue-900 flex items-center justify-center";
             } else if(tpl === 'regal_gold') {
                 card.classList.replace('border-slate-100', 'border-amber-600');
@@ -462,7 +462,7 @@
                 card.querySelector('p').classList.replace('text-slate-500', 'text-amber-900');
                 preview.className = "bg-white rounded-xl border-t-4 border-amber-600 p-5 shadow-sm transition-all";
                 pHeader.className = "text-xs font-black text-amber-900 leading-none uppercase";
-                pSub.textContent = "CampusHub Elite Events";
+                pSub.textContent = "Event Management MACE Elite Events";
                 pIcon.className = "h-8 w-8 bg-amber-50 rounded text-amber-700 flex items-center justify-center";
             }
             lucide.createIcons();
@@ -1188,18 +1188,31 @@
 
         async function loadInventory() {
             const grid = document.getElementById('inventoryGrid');
+            const approvedVenues = new Set([
+                'PTA HALL',
+                'SH2',
+                'SH4',
+                'MCA HALL',
+                'TNP HALL',
+                'MAIN AUDITORIUM',
+                'OAT',
+                'OOTUPURA'
+            ]);
             try {
                 const res = await AuthGuard.secureFetch('/api/events/halls', {
                     headers: {  }
                 });
                 const halls = await res.json();
                 if(res.ok) {
-                    grid.innerHTML = halls.map(h => `
+                    const inventoryHalls = halls.filter(h =>
+                        approvedVenues.has(h.name) || h.name.startsWith('CLASSROOM: ')
+                    );
+                    grid.innerHTML = inventoryHalls.length ? inventoryHalls.map(h => `
                         <div class="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
                             <div class="h-10 w-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-6 font-black group-hover:bg-primary group-hover:text-white transition-colors">V</div>
                             <h4 class="text-xl font-black text-primary tracking-tight mb-2">${h.name}</h4>
                             <p class="text-gray-400 font-bold text-[10px] uppercase tracking-widest flex items-center gap-2 mb-4">
-                                <i data-lucide="users" class="w-3 h-3"></i> Capacity: ${h.capacity}
+                                <i data-lucide="users" class="w-3 h-3"></i> Capacity: ${h.capacity || 'Not specified'}
                             </p>
                             
                             <hr class="mb-5 border-slate-50">
@@ -1224,7 +1237,12 @@
 
                             <p class="text-[10px] text-gray-400 font-medium mt-6 leading-relaxed border-t border-slate-50 pt-4">${h.description || 'General purpose hall for events.'}</p>
                         </div>
-                    `).join('');
+                    `).join('') : `
+                        <div class="col-span-full py-20 text-center text-gray-400 font-bold italic">
+                            <i data-lucide="home" class="h-10 w-10 mx-auto mb-4 opacity-20"></i>
+                            No approved venues are currently registered.
+                        </div>
+                    `;
                     lucide.createIcons();
                 }
             } catch(e) { console.error(e); }

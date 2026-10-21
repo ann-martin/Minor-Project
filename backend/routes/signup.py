@@ -15,7 +15,10 @@ def send_otp():
     Step 1: Validate payload and issue a 6-digit random OTP for email verification.
     Includes logic for club-based constraints (1 admin per club, organizer requires admin).
     """
-    data = request.json
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "A valid JSON request is required"}), 400
+
     email = data.get('email')
     role = data.get('userType')
     org_name = data.get('orgName')
@@ -90,7 +93,6 @@ def send_otp():
 
     # REAL SMTP EMAIL SENDING
     email_sent = send_otp_email(email, otp)
-    print(f"✉️ SMTP OTP sent to {email} (Result: {email_sent})")
+    print(f"SMTP OTP sent to {email} (Result: {email_sent})")
     
     return jsonify({"message": "OTP sent successfully", "mail_status": email_sent}), 200
-

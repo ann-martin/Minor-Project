@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="/js/auth-check.js"></script>
     <script>AuthGuard.requireAuth(['student']);</script>
-    <title>Student Dashboard - College Event Management System</title>
-    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <title>Student Dashboard - Event Management MACE</title>
+    <link rel="icon" type="image/svg+xml" href="../file.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -77,7 +77,7 @@
         <!-- Sidebar -->
         <aside class="flex flex-col border-r border-[#e2e8f0] bg-white p-8">
             <div class="mb-12 flex items-center gap-3">
-                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white font-black text-xl italic shadow-lg shadow-blue-200">A</div>
+                <img src="/file.svg" alt="Event Management MACE logo" class="h-10 w-10 rounded-xl object-contain shadow-lg shadow-blue-200">
                 <span class="text-xl font-black tracking-tighter text-primary">STUDENT HUB</span>
             </div>
 
@@ -123,6 +123,7 @@
                         <a href="student-profile.html" class="w-full py-5 bg-[#1e3a8a] text-white rounded-2xl font-black text-lg hover:bg-[#1e40af] transition-all shadow-xl shadow-blue-900/20 flex items-center justify-center gap-3">
                             Complete Profile Now <i data-lucide="arrow-right" class="h-5 w-5"></i>
                         </a>
+                        <button onclick="dismissProfileOverlay()" class="text-sm font-bold text-[#64748b] hover:text-primary transition-colors">Remind me tomorrow</button>
                         <button onclick="logout()" class="text-sm font-bold text-[#94a3b8] hover:text-[#f87171] transition-colors">Sign out and return later</button>
                     </div>
                 </div>
@@ -389,7 +390,8 @@
 
         // Global state initialization
         let allEventsData = [];
-        let registeredEventIds = [];
+        let registeredEventIds = new Set();
+        let activeEventFilter = 'all';
         let myCertificates = [];
 
         // Section switching logic with persistence
@@ -538,7 +540,7 @@
                                     key: data.key,
                                     amount: data.amount * 100,
                                     currency: "INR",
-                                    name: "CampusHub Culturals",
+                                    name: "Event Management MACE Culturals",
                                     order_id: data.order_id,
                                     handler: async (response) => {
                                         const vRes = await AuthGuard.secureFetch('/api/culturals/verify-booking', {
@@ -1221,8 +1223,11 @@
                 const regRes = await AuthGuard.secureFetch('/api/registrations/my-registrations');
                 const regData = await regRes.json();
                 if(regRes.ok && Array.isArray(regData)) {
-                    // Only mark as REGISTERED if the status is 'approved'
-                    registeredEventIds = regData.filter(r => r.status === 'approved').map(r => r.event_id);
+                    registeredEventIds = new Set(
+                        regData
+                            .filter(r => r.event_id != null && r.status !== 'cancelled')
+                            .map(r => Number(r.event_id))
+                    );
                 }
 
                 const response = await AuthGuard.secureFetch('/api/events/approved');
@@ -1264,6 +1269,7 @@
         }
 
         function filterEvents(type) {
+            activeEventFilter = type;
             // Update UI Active State
             const pills = document.querySelectorAll('.filter-pill');
             pills.forEach(p => {
@@ -1420,9 +1426,10 @@
                                             <i data-lucide="info" class="w-5 h-5"></i>
                                         </button>
                                         
-                                        ${registeredEventIds.includes(e.id) ? `
-                                            <div class="h-12 w-12 bg-emerald-500 text-white rounded-2xl shadow-lg shadow-emerald-200 flex items-center justify-center transition-all animate-in zoom-in" title="Already Registered">
+                                        ${registeredEventIds.has(Number(e.id)) ? `
+                                            <div class="px-5 h-12 bg-emerald-500 text-white rounded-2xl shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 transition-all animate-in zoom-in" title="Already Registered" aria-label="Registered">
                                                 <i data-lucide="check" class="w-6 h-6"></i>
+                                                <span class="font-black text-[10px] uppercase tracking-widest">Registered</span>
                                             </div>
                                         ` : (new Date(e.reg_deadline) < new Date() || new Date(e.start_date) < new Date()) ? `
                                             <button disabled class="px-8 h-12 bg-slate-100 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest cursor-not-allowed">
@@ -2055,6 +2062,9 @@
 
                 if(!res.ok) { Swal.fire('Mission Failed', data.error || 'Unknown error', 'error'); return; }
 
+                registeredEventIds.add(Number(currentEvent.id));
+                filterEvents(activeEventFilter);
+
                 if (data.type === 'team_invite') {
                     Swal.fire('Invitation Sent', 'Team registration initiated! Your friends must accept the invitation in their "Updates" section within 1 hour before you can proceed to payment.', 'success');
                     closeModal();
@@ -2077,7 +2087,7 @@
 
         function startPayment(data, event) {
             var options = {
-                "key": data.key, "amount": data.amount * 100, "currency": "INR", "name": "CampusHub",
+                "key": data.key, "amount": data.amount * 100, "currency": "INR", "name": "Event Management MACE",
                 "description": event.title, "order_id": data.order_id,
                 "handler": async function (resp){
                     Swal.fire({ title: 'Verifying Registration...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
@@ -2124,6 +2134,11 @@
                     const missing = required.filter(field => !u[field] || u[field] === '' || u[field] === 'N/A' || u[field] === 'None');
                     
                     if(missing.length > 0) {
+                        const reminderKey = `profileIncompleteReminderUntil:${u.id}`;
+                        const reminderUntil = Number(localStorage.getItem(reminderKey) || 0);
+                        if (reminderUntil > Date.now()) return;
+                        localStorage.removeItem(reminderKey);
+
                         const overlay = document.getElementById('profileOverlay');
                         overlay.classList.remove('hidden');
                         
@@ -2133,9 +2148,18 @@
                         bodyPara.innerHTML = `Please complete these fields in your profile:<br><div class="flex flex-wrap justify-center gap-2 mt-4">${missingList}</div>`;
                         
                         document.getElementById('userName').innerHTML += ' <span class="ml-2 px-2 py-0.5 bg-amber-100 text-amber-600 rounded-md text-[8px] font-black uppercase tracking-tighter">Profile Incomplete</span>';
+                    } else {
+                        localStorage.removeItem(`profileIncompleteReminderUntil:${u.id}`);
                     }
                 }
             } catch(e) { console.error("Completeness check failed", e); }
+        }
+        function dismissProfileOverlay() {
+            if (myProfile && myProfile.id) {
+                const reminderUntil = Date.now() + 24 * 60 * 60 * 1000;
+                localStorage.setItem(`profileIncompleteReminderUntil:${myProfile.id}`, String(reminderUntil));
+            }
+            document.getElementById('profileOverlay').classList.add('hidden');
         }
         checkProfileCompleteness();
 
